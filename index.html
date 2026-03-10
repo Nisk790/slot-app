@@ -1,0 +1,717 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="description" content="チェーン店をスロット風演出でランダム抽選するWebアプリ">
+<meta name="theme-color" content="#0e0e10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="夜ご飯ルーレット">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-512.png" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<title>夜ご飯ルーレット</title>
+<style>
+/* ===== リセット & CSS変数 ===== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0e0e10;
+  --surface: #1a1a1f;
+  --surface2: #252529;
+  --border: #333339;
+  --text: #ececef;
+  --text-dim: #77777f;
+  --accent: #6e8efb;
+  --accent-glow: rgba(110, 142, 251, 0.35);
+  --danger: #fb6e6e;
+  --radius: 14px;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html { height: 100%; }
+
+body {
+  min-height: 100%;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font-family: var(--font);
+  cursor: pointer;
+  border: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== タイトル ===== */
+.app-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  text-align: center;
+}
+
+/* ===== メイン抽選画面 ===== */
+.main-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px 16px;
+  gap: 36px;
+}
+
+/* --- リール窓 (3行表示) --- */
+:root {
+  --row-h: 52px; /* 1行の高さ */
+}
+
+.reel-frame {
+  width: 100%;
+  max-width: 320px;
+  position: relative;
+}
+
+/* 上下グラデーションで奥行き感 */
+.reel-frame::before,
+.reel-frame::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  height: calc(var(--row-h) + 4px);
+  z-index: 3;
+  pointer-events: none;
+}
+.reel-frame::before {
+  top: 0;
+  background: linear-gradient(to bottom, var(--surface) 20%, transparent);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.reel-frame::after {
+  bottom: 0;
+  background: linear-gradient(to top, var(--surface) 20%, transparent);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.reel-window {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  height: calc(var(--row-h) * 3);
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 2px 12px rgba(0,0,0,0.4);
+}
+
+/* 中央ハイライトライン */
+.reel-window .center-line {
+  position: absolute;
+  left: 6px; right: 6px;
+  top: var(--row-h);
+  height: var(--row-h);
+  border-top: 1.5px solid rgba(110,142,251,0.3);
+  border-bottom: 1.5px solid rgba(110,142,251,0.3);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ストリップ（縦帯） */
+.reel-strip {
+  position: absolute;
+  left: 0; right: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.reel-cell {
+  height: var(--row-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+  color: var(--text-dim);
+}
+
+/* 中央行ハイライト */
+.reel-cell.center {
+  color: var(--accent);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+/* --- SPINボタン --- */
+.spin-btn {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6e8efb, #a777e3);
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 30px var(--accent-glow);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.spin-btn:active:not(:disabled) { transform: scale(0.92); }
+
+.spin-btn:disabled {
+  background: var(--surface2);
+  color: var(--text-dim);
+  box-shadow: none;
+  cursor: default;
+}
+
+/* --- フッター --- */
+.footer {
+  padding: 10px 24px calc(14px + var(--safe-bottom));
+  display: flex;
+  justify-content: center;
+}
+
+.edit-toggle-btn {
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  padding: 8px 22px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.edit-toggle-btn:active {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+/* ===== 編集モーダル（ボトムシート）===== */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 100;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.overlay.open { display: flex; }
+
+.sheet {
+  background: var(--surface);
+  width: 100%;
+  max-height: 90vh;
+  border-radius: 18px 18px 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: sheetUp 0.22s ease-out;
+}
+
+@keyframes sheetUp {
+  from { transform: translateY(30%); opacity: 0.6; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+/* ヘッダー */
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sheet-header h2 { font-size: 1.05rem; font-weight: 600; }
+
+.close-btn {
+  background: none;
+  color: var(--text-dim);
+  font-size: 1.4rem;
+  padding: 4px 6px;
+  line-height: 1;
+}
+
+/* タブ */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.tab {
+  flex: 1;
+  padding: 11px 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* タブ本文 */
+.tab-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pane { display: none; padding: 16px 20px; }
+.pane.active { display: block; }
+
+/* 追加入力 */
+.add-row { display: flex; gap: 8px; margin-bottom: 14px; }
+
+.add-input {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: var(--font);
+  outline: none;
+}
+
+.add-input::placeholder { color: var(--text-dim); }
+.add-input:focus { border-color: var(--accent); }
+
+.add-btn {
+  background: var(--accent);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* リスト */
+.item-count {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.chain-list { list-style: none; }
+
+.chain-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.93rem;
+}
+
+.chain-item:last-child { border-bottom: none; }
+
+.chain-item span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 8px;
+}
+
+.del-btn {
+  background: none;
+  color: var(--danger);
+  font-size: 1.05rem;
+  padding: 6px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.del-btn:active { background: rgba(251,110,110,0.12); }
+
+/* 一括編集 */
+.bulk-area {
+  width: 100%;
+  min-height: 260px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-family: var(--font);
+  resize: vertical;
+  outline: none;
+  line-height: 1.65;
+}
+
+.bulk-area:focus { border-color: var(--accent); }
+
+.bulk-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+.save-btn {
+  flex: 1;
+  background: var(--accent);
+  color: #fff;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 0.93rem;
+  font-weight: 600;
+}
+
+.reset-btn {
+  flex: 1;
+  background: none;
+  color: var(--danger);
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 0.93rem;
+  font-weight: 500;
+  border: 1px solid var(--danger);
+}
+
+.reset-btn:active { background: rgba(251,110,110,0.08); }
+
+/* ===== reduced-motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .sheet { animation: none; }
+  .spin-btn { transition: none; }
+  .reel-text { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== 抽選画面 ===== -->
+<div class="main-screen">
+  <div class="app-title">🍽️ 夜ご飯ルーレット</div>
+
+  <div class="reel-frame">
+    <div class="reel-window" id="reelWindow">
+      <div class="center-line"></div>
+      <!-- ストリップはJSで生成 -->
+    </div>
+  </div>
+
+  <button class="spin-btn" id="spinBtn" type="button">SPIN</button>
+</div>
+
+<div class="footer">
+  <button class="edit-toggle-btn" id="openEdit" type="button">✏️ リスト編集</button>
+</div>
+
+<!-- ===== 編集モーダル ===== -->
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <div class="sheet-header">
+      <h2>リスト編集</h2>
+      <button class="close-btn" id="closeEdit" type="button">✕</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="list" type="button">リスト</button>
+      <button class="tab" data-tab="bulk" type="button">一括編集</button>
+    </div>
+
+    <div class="tab-body">
+      <div class="pane active" id="paneList">
+        <div class="add-row">
+          <input class="add-input" id="addInput" type="text" placeholder="店名を追加" enterkeyhint="done">
+          <button class="add-btn" id="addBtn" type="button">追加</button>
+        </div>
+        <div class="item-count" id="itemCount"></div>
+        <ul class="chain-list" id="chainUl"></ul>
+      </div>
+
+      <div class="pane" id="paneBulk">
+        <textarea class="bulk-area" id="bulkArea" placeholder="1行に1店名を入力"></textarea>
+        <div class="bulk-actions">
+          <button class="save-btn" id="bulkSave" type="button">保存</button>
+          <button class="reset-btn" id="resetBtn" type="button">初期リストに戻す</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========================================
+//  初期チェーン店リスト
+// ========================================
+const defaultChains = [
+  "マクドナルド", "ケンタッキーフライドチキン", "バーガーキング",
+  "松屋", "すき家", "吉野家", "なか卯", "てんや",
+  "CoCo壱番屋", "サイゼリヤ", "ガスト", "デニーズ", "ジョナサン",
+  "ココス", "バーミヤン", "びっくりドンキー", "大戸屋", "やよい軒",
+  "スシロー", "くら寿司", "はま寿司", "ジョリーパスタ", "オリーブの丘",
+  "安楽亭", "牛角", "丸源ラーメン", "山岡家", "一蘭",
+  "丸亀製麺", "はなまるうどん", "リンガーハット", "日高屋", "幸楽苑",
+  "餃子の王将", "大阪王将", "かつや", "松のや", "からやま",
+  "ロイヤルホスト", "ジョイフル", "夢庵", "華屋与兵衛", "藍屋",
+  "ブロンコビリー", "しゃぶ葉", "木曽路", "ステーキ宮", "ポムの樹"
+];
+
+const STORAGE_KEY = "chainSlotList";
+
+// ========================================
+//  データ管理
+// ========================================
+let chains = loadChains();
+let isSpinning = false;
+
+function loadChains() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) return arr;
+    }
+  } catch (_) { }
+  return defaultChains.slice();
+}
+
+function saveChains() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(chains));
+}
+
+function normalize(arr) {
+  const seen = new Set();
+  return arr.map(s => s.trim()).filter(s => {
+    if (!s || seen.has(s)) return false;
+    seen.add(s);
+    return true;
+  });
+}
+
+// ========================================
+//  DOM参照
+// ========================================
+const reelWindow = document.getElementById("reelWindow");
+const spinBtn    = document.getElementById("spinBtn");
+const openEdit   = document.getElementById("openEdit");
+const overlay    = document.getElementById("overlay");
+const closeEdit  = document.getElementById("closeEdit");
+const addInput   = document.getElementById("addInput");
+const addBtn     = document.getElementById("addBtn");
+const itemCount  = document.getElementById("itemCount");
+const chainUl    = document.getElementById("chainUl");
+const bulkArea   = document.getElementById("bulkArea");
+const bulkSave   = document.getElementById("bulkSave");
+const resetBtn   = document.getElementById("resetBtn");
+const tabBtns    = document.querySelectorAll(".tab");
+
+const ROW_H = 52;
+
+// ========================================
+//  リール静止表示
+// ========================================
+function renderStaticReel(centerName) {
+  const above = chains[Math.floor(Math.random() * chains.length)];
+  const below = chains[Math.floor(Math.random() * chains.length)];
+
+  const strip = document.createElement("div");
+  strip.className = "reel-strip";
+
+  [above, centerName, below].forEach((name, i) => {
+    const cell = document.createElement("div");
+    cell.className = "reel-cell" + (i === 1 ? " center" : "");
+    cell.textContent = name;
+    strip.appendChild(cell);
+  });
+
+  strip.style.transform = "translateY(0px)";
+
+  reelWindow.querySelectorAll(".reel-strip").forEach(el => el.remove());
+  reelWindow.appendChild(strip);
+}
+
+renderStaticReel("タップで回そう！");
+
+// ========================================
+//  抽選（リール下方向スクロール）
+// ========================================
+function spin() {
+  if (isSpinning || chains.length === 0) return;
+  isSpinning = true;
+  spinBtn.disabled = true;
+
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const finalName = chains[Math.floor(Math.random() * chains.length)];
+
+  const aboveFinal = chains[Math.floor(Math.random() * chains.length)];
+  const belowFinal = chains[Math.floor(Math.random() * chains.length)];
+  const reelNames = [aboveFinal, finalName, belowFinal];
+
+  const rounds = reduced ? 3 : 6;
+  for (let r = 0; r < rounds; r++) {
+    const shuffled = chains.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    reelNames.push(...shuffled);
+  }
+
+  const strip = document.createElement("div");
+  strip.className = "reel-strip";
+
+  reelNames.forEach(name => {
+    const cell = document.createElement("div");
+    cell.className = "reel-cell";
+    cell.textContent = name;
+    strip.appendChild(cell);
+  });
+
+  reelWindow.querySelectorAll(".reel-strip").forEach(el => el.remove());
+  reelWindow.appendChild(strip);
+
+  const stopY = 0;
+  const startY = -(reelNames.length - 3) * ROW_H;
+  const duration = reduced ? 1200 : 2500 + Math.random() * 1000;
+  const startTime = performance.now();
+
+  function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  function animate(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const easedProgress = easeOutCubic(progress);
+
+    const currentY = startY + (stopY - startY) * easedProgress;
+    strip.style.transform = `translateY(${currentY}px)`;
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      strip.style.transform = `translateY(${stopY}px)`;
+
+      const cells = strip.querySelectorAll(".reel-cell");
+      cells[1].classList.add("center");
+
+      isSpinning = false;
+      spinBtn.disabled = false;
+    }
+  }
+
+  requestAnimationFrame(animate);
+}
+
+spinBtn.addEventListener("click", spin);
+
+// ========================================
+//  編集モーダル
+// ========================================
+function openModal() {
+  renderList();
+  overlay.classList.add("open");
+  switchTab("list");
+}
+
+function closeModal() {
+  overlay.classList.remove("open");
+}
+
+openEdit.addEventListener("click", openModal);
+closeEdit.addEventListener("click", closeModal);
+overlay.addEventListener("click", e => { if (e.target === overlay) closeModal(); });
+
+tabBtns.forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+
+function switchTab(name) {
+  tabBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  document.getElementById("paneList").classList.toggle("active", name === "list");
+  document.getElementById("paneBulk").classList.toggle("active", name === "bulk");
+  if (name === "bulk") bulkArea.value = chains.join("\n");
+}
+
+function renderList() {
+  itemCount.textContent = chains.length + " 件";
+  chainUl.innerHTML = "";
+  chains.forEach((name, i) => {
+    const li = document.createElement("li");
+    li.className = "chain-item";
+
+    const span = document.createElement("span");
+    span.textContent = name;
+
+    const btn = document.createElement("button");
+    btn.className = "del-btn";
+    btn.type = "button";
+    btn.textContent = "🗑";
+    btn.setAttribute("aria-label", name + " を削除");
+    btn.addEventListener("click", () => removeItem(i));
+
+    li.append(span, btn);
+    chainUl.appendChild(li);
+  });
+}
+
+function addItem() {
+  const val = addInput.value.trim();
+  if (!val || chains.includes(val)) { addInput.value = ""; return; }
+  chains.push(val);
+  saveChains();
+  addInput.value = "";
+  renderList();
+}
+
+addBtn.addEventListener("click", addItem);
+addInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addItem(); } });
+
+function removeItem(index) {
+  chains.splice(index, 1);
+  saveChains();
+  renderList();
+}
+
+bulkSave.addEventListener("click", () => {
+  const result = normalize(bulkArea.value.split("\n"));
+  if (!result.length) return;
+  chains = result;
+  saveChains();
+  renderList();
+  switchTab("list");
+});
+
+resetBtn.addEventListener("click", () => {
+  if (!confirm("初期リストに戻しますか？")) return;
+  chains = defaultChains.slice();
+  saveChains();
+  bulkArea.value = chains.join("\n");
+  renderList();
+});
+
+// Service Worker 登録
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
